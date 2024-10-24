@@ -28,6 +28,8 @@ router.post('/login', loginValidation, (req, res) => {
     const { user } = req
 
   return res.status(200).json({ message: `Seja bem-vindo ${user.name}! Pessoa usuária logada com sucesso!` });
+
+   userId: user.email
 });
 
 
