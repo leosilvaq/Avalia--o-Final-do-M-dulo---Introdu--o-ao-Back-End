@@ -1,57 +1,132 @@
-import express from 'express';
+import express, { request, response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { validateMsgRegistration, validadeMsgReader, validateUpDateMsg, validateDeleteMsg } from '../middlewares/validation-notes';
-const router = express.Router();
 
-export const messages = [];
+import { users } from './users'
 
-router.post('/message', validateMsgRegistration, (req, res) => {
-    const { email, title, description } = req.body;
+const router = express.Router()
 
-    const newMessage = {
-        id: uuidv4(),
-        email,
-        title,
-        description,
-    };
+const notes = []
 
-    messages.push(newMessage);
+router.get('/:userId', (request, response) => {
+  const { userId } = request.params
 
-    return res.status(201).json({ message: `Mensagem criada com sucesso!` });
-});
+  // http://localhost:3000/notes/hdhdhdhdhd?page=2&perPage=15
+  const { page, perPage } = request.query
 
-router.get('/message/:email', validadeMsgReader, (req, res) => {
-    const userEmail = req.email;
-    const userMessages = messages.filter(message => message.email === userEmail);
+  const user = users.find(user => user.id === userId)
 
-    if (userMessages.length === 0) {
-        return res.status(404).json({ message: 'Nenhuma mensagem encontrada para este email.' });
+  if (!user) {
+    return response.status(404).json({
+      message: 'Usuário não encontrado.'
+    })
+  }
+
+  const currentPage = parseInt(page) || 1 // valor padrão 1
+  const itemsPerPage = parseInt(perPage) || 10 // valor padrão 10
+
+  const userNotes = notes.filter(note => note.userId === userId)
+
+  const totalItems = userNotes.length
+
+  // currenPage = 2
+  // itemsPerPage = 10
+  // startIndex = (2 - 1) * 10 = 10
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+
+  const paginatedNotes = userNotes.slice(startIndex, endIndex)
+
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+
+  response.status(200).json({
+    notes: paginatedNotes,
+    totalPages,
+    currentPage
+  })
+})
+
+router.post('/', (request, response) => {
+  const { title, description, userId } = request.body
+
+  const user = users.find(user => user.id === userId)
+
+  if (!user) {
+    return response.status(404).json({
+      message: 'Usuário não encontado.'
+    })
+  }
+
+  const newNote = {
+    id: uuidv4(),
+    title,
+    description,
+    userId
+  }
+
+  notes.push(newNote)
+
+  response.status(201).json({
+    message: 'Recado cadastrado com sucesso.',
+    note: newNote
+  })
+})
+
+router.put('/:id', (request, response) => {
+  // entrada de dados
+  const { id } = request.params
+  const { title, description } = request.body
+
+  // processamento
+  const note = notes.find(note => note.id === id)
+
+  if (!note) {
+    return response.status(404).json({
+      message: 'Recado não encontrado.'
+    })
+  }
+
+  note.title = title
+  note.description = description
+
+  return response.status(200).json({
+    message: 'Recado atualizado com sucesso.',
+    note
+  })
+})
+
+router.delete('/:id', (request, response) => {
+    // entrada de dados
+    const { id } = request.params
+
+    const noteIndex = notes.findIndex(note => note.id === id) 
+
+    if (noteIndex === -1) {
+      return response.status(404).json({
+        message: 'Recado não encontrado'
+      })
     }
 
-    return res.status(200).json({ messages: userMessages });
-});
+    //const deletetedNote = notes.splice(noteIndex, 1)[1]
+    const [ deletetedNote ] = notes.splice(noteIndex, 1)
 
-router.put('/message/:id', validateUpDateMsg, (req, res) => {
-    const { id } = req.params;
-    const { title, description } = req.body;
+    response.status(200).json({
+      message: 'Recado excluído com sucesso.',
+      note: deletetedNote
+    })
+})
 
-    const message = messages.find(msg => msg.id == id);
+router.get('/details/:id', (request, response) => {
+  const { id } = request.params
 
-    message.title = title,
-        message.description = description
+  const note = notes.find(note => note.id === id)
 
-    res.status(200).json({ message: `Mensagem atualizada com sucesso! ${message.title}` });
-});
+  if (!note) {
+    return response.status(404).json({
+      message: 'Recado não encontrado.'
+    })
+  }
 
-router.delete('/message/:id', validateDeleteMsg, (req, res) => {
-    const { id } = req.params;
+  response.status(200).json(note)
+})
 
-    const messageIndex = messages.findIndex(msg => msg.id == id);
-
-    const [deletedMessage] = messages.splice(messageIndex, 1);
-
-    res.status(200).json({ message: 'Mensagem apagada com sucesso', deletedMessage  });
-});
-
-
-export default router;
+export default router
